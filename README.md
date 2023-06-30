@@ -7,8 +7,24 @@
 Chat API Proxy是一个免费的接口服务，基于OpenAI的接口格式开发，用于无缝替代OpenAI接口。
 该服务使用了OpenAI GPT-4为基础的[GPT4Free](https://github.com/xtekky/gpt4free)项目。
 
+## 内容大纲
+
+- [To-Do 清单 ✔️](#to-do-清单-✔️)
+- [功能](#功能)
+- [使用方法](#使用方法)
+    - [1. 安装Python](#1-安装python)
+    - [2. 克隆仓库并安装依赖](#2-克隆仓库并安装依赖)
+    - [3. 运行服务](#3-运行服务)
+    - [4. 调用API](#4-调用api)
+- [Docker 🐳](#docker-🐳)
+    - [预安装](#预安装)
+    - [运行 Docker](#运行-docker)
+- [ChatGPT Next Web 接入](#chatgpt-next-web-接入)
+- [FastGPT 接入](#fastgpt-接入)
+
 ## To-Do 清单 ✔️
 
+- [x] 实现ChatCompletion接口
 - [x] 集成 GPT4Free
 - [x] Docker 支持
 - [ ] 支持配置文件自定义其他免费接口
