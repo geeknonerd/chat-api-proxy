@@ -2,15 +2,34 @@ import json
 import os
 import secrets
 import time
-from typing import List, Literal, Iterator
+from typing import List, Literal, Iterator, Any
 
-import g4f
 from fastapi import FastAPI, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+import g4f
+
 AUTH_TOKEN = os.getenv('TOKEN', '')
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins="*",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+config = {
+    'gpt-3.5-turbo': {
+        # China: ChatgptLogin, Yqcloud, Lockchat
+        'provider': os.getenv('GPT35TURBO_PROVIDER', 'Yqcloud')
+    },
+    'gpt-4': {
+        # China: ChatgptLogin
+        'provider': os.getenv('GPT4_PROVIDER', 'ChatgptLogin')
+    }
+}
 
 
 class Message(BaseModel):
@@ -21,7 +40,6 @@ class Message(BaseModel):
 class Args(BaseModel):
     messages: List[Message]
     model: Literal['gpt-3.5-turbo', 'gpt-4']
-    provider: Literal['Lockchat', 'ChatgptLogin', 'Yqcloud'] = 'Yqcloud'
     stream: bool = False
 
 
@@ -109,6 +127,11 @@ def auth_by_token(token: str):
     raise HTTPException(status_code=403)
 
 
+def check_provider(provider: Any, args: Args):
+    if args.model not in getattr(provider, 'model'):
+        raise HTTPException(status_code=400, detail=f'the provider of config not support the model({args.model})')
+
+
 def create_completion_json(response: str, template: Template):
     """Return text completion results in plain JSON."""
     return template.copy().msg(response, finish_reason='stop').usage().build()
@@ -143,13 +166,24 @@ def create_completion_stream(response: Iterator[str], template: Template):
 
 @app.api_route('/v1/chat/completions', methods=['GET', 'POST'])
 def chat_completions(args: Args, token: str = Header(None)):
+    # auth
     auth_by_token(token)
+    # provider
+    provider = getattr(g4f.Provider, config[args.model].get('provider'))
+    check_provider(provider, args)
 
+    # adapting stream
+    supports_stream = getattr(provider, 'supports_stream')
+    # call g4f
     resp = g4f.ChatCompletion.create(
-        model=args.model, provider=getattr(g4f.Provider, args.provider),
-        messages=[m.dict() for m in args.messages], stream=args.stream)
+        model=args.model, provider=provider,
+        messages=[m.dict() for m in args.messages], stream=True if supports_stream and args.stream else False)
+
+    # response
     prompt = args.messages[-1].content if args.messages else ''
     if args.stream:
+        if not supports_stream:
+            resp = [resp]
         return create_completion_stream(resp, Template('chat.completion.chunk', args.model, prompt, args.stream))
     else:
         return create_completion_json(resp, Template('chat.completion', args.model, prompt, args.stream))
