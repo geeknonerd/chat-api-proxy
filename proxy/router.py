@@ -4,22 +4,15 @@ import secrets
 import time
 from typing import List, Literal, Iterator, Any
 
-from fastapi import FastAPI, HTTPException, Header
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, validator
 
 import g4f
 
+router = APIRouter()
+
 AUTH_TOKEN = os.getenv('TOKEN', '')
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins="*",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 CONFIGS = {
     'g4f': {
         'gpt-3.5-turbo': {
@@ -175,7 +168,7 @@ def create_completion_stream(response: Iterator[str], template: Template):
     return StreamingResponse(stream(), media_type='text/event-stream')
 
 
-@app.api_route('/v1/chat/completions', methods=['GET', 'POST'])
+@router.api_route('/v1/chat/completions', methods=['GET', 'POST'])
 async def chat_completions(args: Args, token: str = Header(None)):
     # auth
     auth_by_token(token)
@@ -199,14 +192,3 @@ async def chat_completions(args: Args, token: str = Header(None)):
         return create_completion_stream(resp, Template('chat.completion.chunk', args.model, prompt, args.stream))
     else:
         return create_completion_json(resp, Template('chat.completion', args.model, prompt, args.stream))
-
-
-if __name__ == '__main__':
-    try:
-        r = g4f.ChatCompletion.create(
-            model='gpt-3.5-turbo', provider=getattr(g4f.Provider, 'ChatgptLogin'),
-            messages=[
-                {"role": "user", "content": "Hello world"}], stream=False)
-        print(r)
-    except Exception as e:
-        print(f'An error occurred: {e}')
