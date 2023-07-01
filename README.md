@@ -66,7 +66,9 @@ python3 -m pip install -r requirements.txt
 ### 3. 运行服务
 
 ```shell
-python3 -m uvicorn app.main:app --reload
+python3 -m uvicorn main:app --reload
+# or
+python3 main.py
 ```
 
 然后你就可以在 http://localhost:8000/ 访问到你的 API 服务了。
