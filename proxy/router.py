@@ -1,31 +1,18 @@
 import json
-import os
 import secrets
 import time
 from typing import List, Literal, Iterator, Any
 
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, validator
 
 import g4f
+from .config import get_settings
 
 router = APIRouter()
 
-AUTH_TOKEN = os.getenv('TOKEN', '')
-CONFIGS = {
-    'g4f': {
-        'gpt-3.5-turbo': {
-            # China: ChatgptLogin, Yqcloud, Lockchat
-            'provider': os.getenv('GPT35TURBO_PROVIDER', 'Yqcloud')
-        },
-        'gpt-4': {
-            # China: Lockchat
-            'provider': os.getenv('GPT4_PROVIDER', 'Lockchat')
-        }
-    }
-}
-config = CONFIGS.get('g4f')
+config = get_settings().get_generator_cnf()
 
 
 class Message(BaseModel):
@@ -120,15 +107,6 @@ class Template:
         return cur_data
 
 
-def auth_by_token(token: str):
-    """Auth by token, if token is None, then skip"""
-    if not AUTH_TOKEN:
-        return
-    if token.lstrip('Bearer ') == AUTH_TOKEN:
-        return
-    raise HTTPException(status_code=403)
-
-
 def check_provider(provider: Any, args: Args):
     if not provider:
         return
@@ -169,9 +147,7 @@ def create_completion_stream(response: Iterator[str], template: Template):
 
 
 @router.api_route('/v1/chat/completions', methods=['GET', 'POST'])
-async def chat_completions(args: Args, token: str = Header(None)):
-    # auth
-    auth_by_token(token)
+async def chat_completions(args: Args):
     # provider
     provider_name = config.get(args.model, {}).get('provider')
     provider = getattr(g4f.Provider, provider_name) if provider_name else None
