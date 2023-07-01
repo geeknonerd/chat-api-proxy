@@ -26,8 +26,8 @@ config = {
         'provider': os.getenv('GPT35TURBO_PROVIDER', 'Yqcloud')
     },
     'gpt-4': {
-        # China: ChatgptLogin
-        'provider': os.getenv('GPT4_PROVIDER', 'ChatgptLogin')
+        # China: Lockchat
+        'provider': os.getenv('GPT4_PROVIDER', 'Lockchat')
     }
 }
 
@@ -192,7 +192,7 @@ def chat_completions(args: Args, token: str = Header(None)):
 if __name__ == '__main__':
     try:
         r = g4f.ChatCompletion.create(
-            model='gpt-3.5-turbo', provider=getattr(g4f.Provider, 'Lockchat'),
+            model='gpt-3.5-turbo', provider=getattr(g4f.Provider, 'ChatgptLogin'),
             messages=[
                 {"role": "user", "content": "Hello world"}], stream=False)
         print(r)
