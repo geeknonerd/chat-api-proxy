@@ -176,7 +176,7 @@ def create_completion_stream(response: Iterator[str], template: Template):
 
 
 @app.api_route('/v1/chat/completions', methods=['GET', 'POST'])
-def chat_completions(args: Args, token: str = Header(None)):
+async def chat_completions(args: Args, token: str = Header(None)):
     # auth
     auth_by_token(token)
     # provider
