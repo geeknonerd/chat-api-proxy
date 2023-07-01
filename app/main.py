@@ -7,7 +7,7 @@ from typing import List, Literal, Iterator, Any
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 
 import g4f
 
@@ -20,16 +20,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-config = {
-    'gpt-3.5-turbo': {
-        # China: ChatgptLogin, Yqcloud, Lockchat
-        'provider': os.getenv('GPT35TURBO_PROVIDER', 'Yqcloud')
-    },
-    'gpt-4': {
-        # China: Lockchat
-        'provider': os.getenv('GPT4_PROVIDER', 'Lockchat')
+CONFIGS = {
+    'g4f': {
+        'gpt-3.5-turbo': {
+            # China: ChatgptLogin, Yqcloud, Lockchat
+            'provider': os.getenv('GPT35TURBO_PROVIDER', 'Yqcloud')
+        },
+        'gpt-4': {
+            # China: Lockchat
+            'provider': os.getenv('GPT4_PROVIDER', 'Lockchat')
+        }
     }
 }
+config = CONFIGS.get('g4f')
 
 
 class Message(BaseModel):
@@ -39,8 +42,14 @@ class Message(BaseModel):
 
 class Args(BaseModel):
     messages: List[Message]
-    model: Literal['gpt-3.5-turbo', 'gpt-4']
+    model: str
     stream: bool = False
+
+    @validator('model')
+    def validate_model(cls, m):
+        if m not in g4f.ModelUtils.convert.keys():
+            raise ValueError(f'model not g4f models: {g4f.ModelUtils.convert.keys()}')
+        return m
 
 
 class Template:
@@ -128,6 +137,8 @@ def auth_by_token(token: str):
 
 
 def check_provider(provider: Any, args: Args):
+    if not provider:
+        return
     if args.model not in getattr(provider, 'model'):
         raise HTTPException(status_code=400, detail=f'the provider of config not support the model({args.model})')
 
@@ -169,11 +180,12 @@ def chat_completions(args: Args, token: str = Header(None)):
     # auth
     auth_by_token(token)
     # provider
-    provider = getattr(g4f.Provider, config[args.model].get('provider'))
+    provider_name = config.get(args.model, {}).get('provider')
+    provider = getattr(g4f.Provider, provider_name) if provider_name else None
     check_provider(provider, args)
 
     # adapting stream
-    supports_stream = getattr(provider, 'supports_stream')
+    supports_stream = getattr(provider, 'supports_stream') if provider else False
     # call g4f
     resp = g4f.ChatCompletion.create(
         model=args.model, provider=provider,
