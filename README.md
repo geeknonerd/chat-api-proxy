@@ -25,6 +25,7 @@ Chat API Proxy是一个免费的接口服务，基于OpenAI的接口格式开发
 ## To-Do 清单 ✔️
 
 - [x] 实现ChatCompletion接口
+- [x] 通过环境变量设置token认证
 - [x] 集成 GPT4Free
 - [x] Docker 支持
 - [x] 支持配置文件自定义其他免费接口
