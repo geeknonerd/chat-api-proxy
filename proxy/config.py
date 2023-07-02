@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     def get_generator_cnf(self) -> dict:
         """get generator config"""
         if self.mode == 'api':
-            return self.get_cnf()
+            return self.get_cnf(gpt35turbo='macqv.yaml')
         return self.get_cnf(gpt35turbo='Yqcloud', gpt4='Lockchat')  # China: ChatgptLogin, Yqcloud, Lockchat
 
 

@@ -1,3 +1,7 @@
 fastapi
 pydantic
 uvicorn
+requests
+simpleeval
+pyyaml
+sseclient-py

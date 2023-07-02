@@ -1,9 +1,13 @@
 import json
+import time
 from abc import ABC, abstractmethod
 from typing import Iterator, Any
 
+import requests
+import yaml
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+from simpleeval import EvalWithCompoundTypes
 
 import g4f
 from .schema import Args
@@ -18,13 +22,6 @@ class Engine(ABC):
     @abstractmethod
     def stream_response(self, args: Args):
         pass
-
-
-class G4fEngine(Engine):
-    """g4f generator"""
-
-    def __init__(self, config: dict):
-        self.config = config
 
     @staticmethod
     def create_completion_json(response: str, template: Template):
@@ -57,6 +54,13 @@ class G4fEngine(Engine):
                              separators=(",", ":"))
 
         return StreamingResponse(stream(), media_type='text/event-stream')
+
+
+class G4fEngine(Engine):
+    """g4f generator"""
+
+    def __init__(self, config: dict):
+        self.config = config
 
     def check_provider(self, model: str) -> Any:
         """check provider is support or not"""
@@ -108,12 +112,41 @@ class ApiEngine(Engine):
     """api generator"""
 
     def __init__(self, config: dict):
-        self.config = config
+        self.eval_engine = EvalWithCompoundTypes
+        self.config = config.copy()
+        for k, v in self.config.items():
+            if not v['provider']:
+                continue
+            tpl = self.load_yaml(f"ext/{v['provider']}")
+            if k not in tpl.get('models', []):
+                continue
+            self.config[k]['tpl'] = tpl
+
+    @staticmethod
+    def load_yaml(path: str):
+        with open(path) as file:
+            data = yaml.safe_load(file)
+        return data
+
+    def check_tpl(self, model: str):
+        """check template"""
+        tpl = self.config.get(model, {}).get('tpl', {})
+        if not (tpl.get('args_tpl') and tpl.get('resp_tpl')):
+            raise HTTPException(status_code=500, detail=f'model set template error')
+        return tpl
 
     def json_response(self, args: Args):
         """full response by json"""
-        pass
+        tpl = self.check_tpl(args.model)
+        prompt = args.messages[-1].content if args.messages else ''
+        kwargs = self.eval_engine(
+            names={'args': args.dict(), 'prompt': prompt, 'timestamp': int(time.time() * 1000)}).eval(
+            tpl.get('args_tpl'))
+        response = requests.request(**kwargs)
+        res = self.eval_engine(names={'response': response}).eval(tpl.get('resp_tpl'))
+        return self.create_completion_json(res, Template('chat.completion', args.model, prompt, args.stream))
 
     def stream_response(self, args: Args):
         """response by stream"""
-        pass
+        # TODO: support stream
+        raise HTTPException(status_code=400, detail=f'api mode not support stream now')

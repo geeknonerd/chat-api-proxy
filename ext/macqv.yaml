@@ -1,0 +1,19 @@
+models:
+  - gpt-3.5-turbo
+args_tpl: |
+  {
+    "method": "POST",
+    "url": "https://macqv.com/api/generate",
+    "json": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hive"
+        }
+      ],
+      "time": 1688337023710,
+      "sign": "1c110ca2f30d50b90c76dd148491861cbc8a385d034024d94a55d047bc73d36f"
+    }
+  }
+resp_way: once
+resp_tpl: response.text
