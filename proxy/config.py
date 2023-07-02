@@ -8,23 +8,27 @@ __all__ = ['get_settings']
 
 class Settings(BaseSettings):
     """Global settings by environment"""
-    mode: Literal['g4f'] = 'g4f'
+    mode: Literal['g4f', 'api'] = 'g4f'
     auth_token: str = ''
-    gpt35turbo_provider: str = 'Yqcloud'  # China: ChatgptLogin, Yqcloud, Lockchat
-    gpt4_provider: str = 'Lockchat'  # China: Lockchat
+    gpt35turbo_provider: str = ''
+    gpt4_provider: str = ''
 
-    def get_generator_cnf(self) -> dict:
-        default_dict = {
-            'g4f': {
-                'gpt-3.5-turbo': {
-                    'provider': self.gpt35turbo_provider
-                },
-                'gpt-4': {
-                    'provider': self.gpt4_provider
-                }
+    def get_cnf(self, gpt35turbo='', gpt4=''):
+        """get config"""
+        return {
+            'gpt-3.5-turbo': {
+                'provider': self.gpt35turbo_provider or gpt35turbo
+            },
+            'gpt-4': {
+                'provider': self.gpt4_provider or gpt4
             }
         }
-        return default_dict[self.mode]
+
+    def get_generator_cnf(self) -> dict:
+        """get generator config"""
+        if self.mode == 'api':
+            return self.get_cnf()
+        return self.get_cnf(gpt35turbo='Yqcloud', gpt4='Lockchat')  # China: ChatgptLogin, Yqcloud, Lockchat
 
 
 @lru_cache()

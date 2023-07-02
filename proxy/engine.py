@@ -1,4 +1,5 @@
 import json
+from abc import ABC, abstractmethod
 from typing import Iterator, Any
 
 from fastapi import HTTPException
@@ -9,7 +10,19 @@ from .schema import Args
 from .template import Template
 
 
-class G4fEngine:
+class Engine(ABC):
+    @abstractmethod
+    def json_response(self, args: Args):
+        pass
+
+    @abstractmethod
+    def stream_response(self, args: Args):
+        pass
+
+
+class G4fEngine(Engine):
+    """g4f generator"""
+
     def __init__(self, config: dict):
         self.config = config
 
@@ -46,6 +59,7 @@ class G4fEngine:
         return StreamingResponse(stream(), media_type='text/event-stream')
 
     def check_provider(self, model: str) -> Any:
+        """check provider is support or not"""
         # provider
         provider_name = self.config.get(model, {}).get('provider')
         provider = getattr(g4f.Provider, provider_name) if provider_name else None
@@ -56,9 +70,11 @@ class G4fEngine:
         return provider
 
     def supports_stream(self, provider) -> bool:
+        """supports stream or not"""
         return getattr(provider, 'supports_stream') if provider else False
 
     def json_response(self, args: Args):
+        """full response by json"""
         provider = self.check_provider(args.model)
 
         # call g4f
@@ -71,7 +87,8 @@ class G4fEngine:
         return self.create_completion_json(resp, Template('chat.completion', args.model, prompt, args.stream))
 
     def stream_response(self, args: Args):
-        provider = self.check_provider(self, args.model)
+        """response by stream"""
+        provider = self.check_provider(args.model)
 
         # adapting stream
         supports_stream = self.supports_stream(provider)
@@ -85,3 +102,18 @@ class G4fEngine:
         if not supports_stream:
             resp = [resp]
         return self.create_completion_stream(resp, Template('chat.completion.chunk', args.model, prompt, args.stream))
+
+
+class ApiEngine(Engine):
+    """api generator"""
+
+    def __init__(self, config: dict):
+        self.config = config
+
+    def json_response(self, args: Args):
+        """full response by json"""
+        pass
+
+    def stream_response(self, args: Args):
+        """response by stream"""
+        pass
