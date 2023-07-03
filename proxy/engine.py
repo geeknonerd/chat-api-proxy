@@ -4,12 +4,12 @@ from abc import ABC, abstractmethod
 from typing import Iterator, Any
 
 import requests
-import yaml
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from simpleeval import EvalWithCompoundTypes
 
 import g4f
+from .config import G4fProviderCnf, ApiProviderCnf
 from .schema import Args
 from .template import Template
 
@@ -59,13 +59,13 @@ class Engine(ABC):
 class G4fEngine(Engine):
     """g4f generator"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: G4fProviderCnf):
         self.config = config
 
     def check_provider(self, model: str) -> Any:
         """check provider is support or not"""
         # provider
-        provider_name = self.config.get(model, {}).get('provider')
+        provider_name = getattr(self.config, model) if hasattr(self.config, model) else None
         provider = getattr(g4f.Provider, provider_name) if provider_name else None
         if not provider:
             return
@@ -111,39 +111,41 @@ class G4fEngine(Engine):
 class ApiEngine(Engine):
     """api generator"""
 
-    def __init__(self, config: dict):
+    def __init__(self, config: ApiProviderCnf):
         self.eval_engine = EvalWithCompoundTypes
-        self.config = config.copy()
-        for k, v in self.config.items():
-            if not v['provider']:
-                continue
-            tpl = self.load_yaml(f"ext/{v['provider']}")
-            if k not in tpl.get('models', []):
-                continue
-            self.config[k]['tpl'] = tpl
+        self.config = config
+
+    def check_tpl(self, model: str, resp_type: str = 'json') -> dict:
+        """check template"""
+        if not hasattr(self.config, model):
+            raise HTTPException(status_code=500, detail=f'model not support or not config')
+        provider = getattr(self.config, model)
+        if not hasattr(provider, resp_type):
+            raise HTTPException(status_code=500, detail=f'model not support the response type')
+        tpl = getattr(provider, resp_type)
+        if not (tpl.args_tpl and tpl.resp_tpl):
+            raise HTTPException(status_code=500, detail=f'model template config error')
+        return tpl
 
     @staticmethod
-    def load_yaml(path: str):
-        with open(path) as file:
-            data = yaml.safe_load(file)
-        return data
+    def get_prompt(args: Args) -> str:
+        return args.messages[-1].content if args.messages else ''
 
-    def check_tpl(self, model: str):
-        """check template"""
-        tpl = self.config.get(model, {}).get('tpl', {})
-        if not (tpl.get('args_tpl') and tpl.get('resp_tpl')):
-            raise HTTPException(status_code=500, detail=f'model set template error')
-        return tpl
+    def get_args_by_tpl(self, args: Args, args_tpl: str) -> Any:
+        prompt = self.get_prompt(args)
+        return self.eval_engine(
+            names={'args': args.dict(), 'prompt': prompt, 'timestamp': int(time.time() * 1000)}).eval(args_tpl)
+
+    def get_resp_by_tpl(self, resp: requests.Response, resp_tpl: str) -> Any:
+        return self.eval_engine(names={'response': resp}).eval(resp_tpl)
 
     def json_response(self, args: Args):
         """full response by json"""
-        tpl = self.check_tpl(args.model)
-        prompt = args.messages[-1].content if args.messages else ''
-        kwargs = self.eval_engine(
-            names={'args': args.dict(), 'prompt': prompt, 'timestamp': int(time.time() * 1000)}).eval(
-            tpl.get('args_tpl'))
+        tpl = self.check_tpl(args.model, resp_type='json')
+        prompt = self.get_prompt(args)
+        kwargs = self.get_args_by_tpl(args, tpl.args_tpl)
         response = requests.request(**kwargs)
-        res = self.eval_engine(names={'response': response}).eval(tpl.get('resp_tpl'))
+        res = self.get_resp_by_tpl(response, tpl.resp_tpl)
         return self.create_completion_json(res, Template('chat.completion', args.model, prompt, args.stream))
 
     def stream_response(self, args: Args):

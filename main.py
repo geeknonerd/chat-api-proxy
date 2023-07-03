@@ -1,5 +1,8 @@
+# import nest_asyncio
+
 from proxy import create_app
 
+# nest_asyncio.apply()
 # start app
 app = create_app()
 

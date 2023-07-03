@@ -1,6 +1,7 @@
 fastapi
 pydantic
 uvicorn
+#nest-asyncio
 requests
 simpleeval
 pyyaml
