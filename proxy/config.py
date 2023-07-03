@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Literal, Any
@@ -5,7 +6,9 @@ from typing import Literal, Any
 import yaml
 from pydantic import BaseSettings
 
-__all__ = ['get_settings', 'G4fProviderCnf', 'ApiProviderCnf']
+__all__ = ['get_settings', 'G4fProviderCnf', 'ApiProviderCnf', 'ApiExtTpl']
+
+logger = logging.getLogger('uvicorn.error')
 
 
 class Settings(BaseSettings):
@@ -14,22 +17,16 @@ class Settings(BaseSettings):
     auth_token: str = ''
     gpt35turbo_provider: str = ''
     gpt4_provider: str = ''
-
-    def get_cnf(self, gpt35turbo='', gpt4=''):
-        """get config"""
-        return {
-            'gpt-3.5-turbo': {
-                'provider': self.gpt35turbo_provider or gpt35turbo
-            },
-            'gpt-4': {
-                'provider': self.gpt4_provider or gpt4
-            }
-        }
+    gpt35turbo_stream_provider: str = ''
+    gpt4_stream_provider: str = ''
 
     def get_generator_cnf(self) -> Any:
         """get generator config"""
         if self.mode == 'api':
-            return ApiProviderCnf(gpt35turbo=ApiArgs(json='macqv.yaml'))
+            return ApiProviderCnf(
+                gpt35turbo=ApiArgs(json=self.gpt35turbo_provider or 'aitianhu.yaml',
+                                   stream=self.gpt35turbo_stream_provider or 'aitianhu.yaml'),
+                gpt4=ApiArgs(json=self.gpt4_provider, stream=self.gpt4_stream_provider))
         return G4fProviderCnf(
             gpt35turbo=self.gpt35turbo_provider, gpt4=self.gpt4_provider)  # China: ChatgptLogin, Yqcloud, Lockchat
 
@@ -46,6 +43,7 @@ class G4fProviderCnf:
     gpt4: str = 'Lockchat'
 
     def __init__(self, gpt35turbo=None, gpt4=None):
+        logger.info(f'G4fProviderCnf: {gpt35turbo=}, {gpt4}')
         if gpt35turbo:
             self.gpt35turbo = gpt35turbo
         if gpt4:
@@ -82,6 +80,7 @@ class ApiProviderCnf:
     gpt4: ApiProvider
 
     def __init__(self, gpt35turbo: ApiArgs = None, gpt4: ApiArgs = None):
+        logger.info(f'ApiProviderCnf: {gpt35turbo=}, {gpt4=}')
         if gpt35turbo:
             self.gpt35turbo = self.load_provider(gpt35turbo)
         if gpt4:

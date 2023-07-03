@@ -1,0 +1,16 @@
+models:
+  - gpt-3.5-turbo
+args_tpl: |
+  {
+    "method": "POST",
+    "url": "https://vhbry.aitianhu.top/api/chat-process",
+    "json": {
+      "prompt": prompt,
+      "options": {},
+      "systemMessage": args["messages"] if args["messages"][0]["role"] == "system" else "",
+      "temperature": 0.8,
+      "top_p": 1
+    }
+  }
+resp_way: octet-stream
+resp_tpl: response["text"]

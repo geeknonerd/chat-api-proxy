@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from abc import ABC, abstractmethod
 from typing import Iterator, Any
@@ -9,9 +10,11 @@ from fastapi.responses import StreamingResponse
 from simpleeval import EvalWithCompoundTypes
 
 import g4f
-from .config import G4fProviderCnf, ApiProviderCnf
+from .config import G4fProviderCnf, ApiProviderCnf, ApiExtTpl
 from .schema import Args
 from .template import Template
+
+logger = logging.getLogger('uvicorn.error')
 
 
 class Engine(ABC):
@@ -115,7 +118,7 @@ class ApiEngine(Engine):
         self.eval_engine = EvalWithCompoundTypes
         self.config = config
 
-    def check_tpl(self, model: str, resp_type: str = 'json') -> dict:
+    def check_tpl(self, model: str, resp_type: str = 'json') -> ApiExtTpl:
         """check template"""
         if not hasattr(self.config, model):
             raise HTTPException(status_code=500, detail=f'model not support or not config')
@@ -139,16 +142,39 @@ class ApiEngine(Engine):
     def get_resp_by_tpl(self, resp: requests.Response, resp_tpl: str) -> Any:
         return self.eval_engine(names={'response': resp}).eval(resp_tpl)
 
+    def handle_request_for_once(self, tpl: ApiExtTpl, kwargs: dict) -> Any:
+        if tpl.resp_way == 'once':
+            response = requests.request(**kwargs)
+        elif tpl.resp_way == 'octet-stream':
+            response = requests.request(**kwargs)
+            for line in response.iter_lines():
+                pass
+            response = json.loads(line.decode('utf-8'))
+        return self.get_resp_by_tpl(response, tpl.resp_tpl)
+
+    def handle_request_for_multi(self, tpl: ApiExtTpl, kwargs: dict) -> Any:
+        if tpl.resp_way == 'once':
+            response = requests.request(**kwargs)
+            return [self.get_resp_by_tpl(response, tpl.resp_tpl)]
+        elif tpl.resp_way == 'octet-stream':
+            response = requests.request(stream=True, **kwargs)
+            for line in response.iter_lines():
+                yield self.get_resp_by_tpl(json.loads(line.decode('utf-8')), tpl.resp_tpl)
+
     def json_response(self, args: Args):
         """full response by json"""
         tpl = self.check_tpl(args.model, resp_type='json')
+        logger.info(f'json_response: {args.model=}, {tpl.resp_way=}')
         prompt = self.get_prompt(args)
         kwargs = self.get_args_by_tpl(args, tpl.args_tpl)
-        response = requests.request(**kwargs)
-        res = self.get_resp_by_tpl(response, tpl.resp_tpl)
-        return self.create_completion_json(res, Template('chat.completion', args.model, prompt, args.stream))
+        resp = self.handle_request_for_once(tpl, kwargs)
+        return self.create_completion_json(resp, Template('chat.completion', args.model, prompt, args.stream))
 
     def stream_response(self, args: Args):
         """response by stream"""
-        # TODO: support stream
-        raise HTTPException(status_code=400, detail=f'api mode not support stream now')
+        tpl = self.check_tpl(args.model, resp_type='stream')
+        logger.info(f'stream_response: {args.model=}, {tpl.resp_way=}')
+        prompt = self.get_prompt(args)
+        kwargs = self.get_args_by_tpl(args, tpl.args_tpl)
+        resp = self.handle_request_for_once(tpl, kwargs)
+        return self.create_completion_stream(resp, Template('chat.completion.chunk', args.model, prompt, args.stream))
