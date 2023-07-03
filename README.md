@@ -34,7 +34,7 @@ Chat API Proxy是一个免费的接口服务，基于OpenAI的接口格式开发
 
 ## 功能
 
-* 无缝替代OpenAI接口
+* 无缝替代OpenAI接口 (ChatCompletion)
 * 支持与OpenAI接口一样的请求和响应格式
 * 免费使用，无需支付额外费用
 * 无缝对接其他热门项目，如下：
