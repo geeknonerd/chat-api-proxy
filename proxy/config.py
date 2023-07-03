@@ -95,7 +95,7 @@ class ApiProviderCnf:
         stream_tpl = None
         if args.json:
             tpl = ApiExtTpl(**ApiProviderCnf.load_yaml(f"ext/{args.json}"))
-            if tpl.resp_way in ['once', 'octet-stream']:
+            if tpl.resp_way in ['once', 'octet-stream', 'event-stream']:
                 json_tpl = tpl
         if args.stream:
             tpl = ApiExtTpl(**ApiProviderCnf.load_yaml(f"ext/{args.stream}"))
