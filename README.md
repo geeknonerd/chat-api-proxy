@@ -4,6 +4,9 @@
 ![GitHub forks](https://img.shields.io/github/forks/geeknonerd/chat-api-proxy)
 ![GitHub stars](https://img.shields.io/github/stars/geeknonerd/chat-api-proxy)
 
+> English | [中文](README_cn.md)
+
+
 Chat API Proxy is a free interface service developed based on the OpenAI interface format, designed to seamlessly replace the OpenAI interface. This service utilizes the [GPT4Free](https://github.com/xtekky/gpt4free) project, which is built on top of OpenAI GPT-4.
 
 ## Table of Contents
