@@ -9,6 +9,7 @@ RUN python3 -m pip install -i https://pypi.doubanio.com/simple/ --user --no-cach
 
 COPY ./gpt4free/g4f /code/g4f
 COPY ./proxy /code/proxy
+COPY ./ext /code/ext
 COPY main.py /code
 
 CMD ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
